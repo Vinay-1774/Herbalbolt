@@ -1,10 +1,17 @@
 /**
- * HERBALBOLT LLP — OFFICIAL CORPORATE JAVASCRIPT
- * Typography: Brandon Grotesque
- * Interactions: Responsive Navigation, Play Bull Product Actions, Contact Handling
+ * HERBALBOLT LLP — WEBSITE JAVASCRIPT
+ * Lenis smooth scroll, GSAP ScrollTrigger reveals, animated cards,
+ * navigation, product enquiry and contact form handling.
  */
 
+let lenisInstance = null;
+
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 document.addEventListener('DOMContentLoaded', () => {
+  initLenis();
+  initGSAPAnimations();
+  initCardSpotlight();
   initNavigation();
   initScrollSpy();
   initProductInteractions();
@@ -12,7 +19,154 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================================
-// 1. Navigation & Mobile Drawer
+// 1. Lenis Smooth Scrolling Setup
+// ============================================================================
+function getNavOffset() {
+  return window.innerWidth <= 640 ? -68 : -76;
+}
+
+function initLenis() {
+  if (typeof Lenis === 'undefined' || prefersReducedMotion) return;
+
+  lenisInstance = new Lenis({
+    duration: 1.2,
+    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+    smoothWheel: true,
+    touchMultiplier: 2
+  });
+
+  if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
+    gsap.registerPlugin(ScrollTrigger);
+    lenisInstance.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add((time) => lenisInstance.raf(time * 1000));
+    gsap.ticker.lagSmoothing(0);
+  } else {
+    const raf = (time) => {
+      lenisInstance.raf(time);
+      requestAnimationFrame(raf);
+    };
+    requestAnimationFrame(raf);
+  }
+
+  document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+    anchor.addEventListener('click', (e) => {
+      const targetId = anchor.getAttribute('href');
+      if (!targetId || targetId === '#') return;
+
+      const targetEl = document.querySelector(targetId);
+      if (!targetEl) return;
+
+      e.preventDefault();
+      lenisInstance.scrollTo(targetEl, { offset: getNavOffset(), duration: 1.1 });
+    });
+  });
+}
+
+// ============================================================================
+// 2. GSAP ScrollTrigger Reveals
+// ============================================================================
+// Reveals use fromTo with explicit end values: plain from() re-reads the
+// "current" style on ScrollTrigger refresh, which can capture opacity 0.
+const REVEAL_END = { x: 0, y: 0, scale: 1, opacity: 1, clearProps: 'all' };
+
+const REVEAL_FROM = {
+  up: { y: 40, opacity: 0 },
+  left: { x: -40, opacity: 0 },
+  right: { x: 40, opacity: 0 },
+  zoom: { scale: 0.94, opacity: 0 }
+};
+
+function initGSAPAnimations() {
+  if (typeof gsap === 'undefined' || typeof ScrollTrigger === 'undefined' || prefersReducedMotion) {
+    initCounters(false);
+    return;
+  }
+  gsap.registerPlugin(ScrollTrigger);
+
+  // Hero entrance
+  gsap.timeline({ defaults: { ease: 'power3.out', duration: 0.8 } })
+    .fromTo('.hero-eyebrow', { y: 20, opacity: 0 }, { ...REVEAL_END, duration: 0.6 })
+    .fromTo('.hero-line', { y: 60, opacity: 0 }, { ...REVEAL_END, stagger: 0.12, duration: 0.9 }, '-=0.3')
+    .fromTo('.hero-description', { y: 20, opacity: 0 }, REVEAL_END, '-=0.5')
+    .fromTo('.hero-cta-group .btn', { y: 20, opacity: 0 }, { ...REVEAL_END, stagger: 0.1 }, '-=0.5')
+    .fromTo('.hero-stats .stat', { y: 20, opacity: 0 }, { ...REVEAL_END, stagger: 0.08 }, '-=0.5')
+    .fromTo('.hero-image-wrapper', { scale: 0.92, opacity: 0 }, { ...REVEAL_END, duration: 1.1 }, 0.2)
+    .fromTo('.float-card', { scale: 0.8, opacity: 0 }, { ...REVEAL_END, stagger: 0.15, ease: 'back.out(1.7)' }, 0.8);
+
+  gsap.to('.hero-image', {
+    yPercent: 6,
+    ease: 'none',
+    scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 1 }
+  });
+
+  // Single elements
+  gsap.utils.toArray('[data-reveal]').forEach((el) => {
+    const from = REVEAL_FROM[el.dataset.reveal] || REVEAL_FROM.up;
+    gsap.fromTo(el, from, {
+      ...REVEAL_END,
+      duration: 0.9,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: el, start: 'top 85%', once: true }
+    });
+  });
+
+  // Card groups
+  gsap.utils.toArray('[data-stagger]').forEach((group) => {
+    gsap.fromTo(group.children, { y: 50, opacity: 0, scale: 0.96 }, {
+      ...REVEAL_END,
+      duration: 0.8,
+      stagger: 0.12,
+      ease: 'power3.out',
+      scrollTrigger: { trigger: group, start: 'top 85%', once: true }
+    });
+  });
+
+  // Product bottle float
+  gsap.to('.product-img', { y: -14, duration: 2.6, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+
+  initCounters(true);
+}
+
+// ============================================================================
+// 3. Count-up Numbers
+// ============================================================================
+function initCounters(animate) {
+  document.querySelectorAll('[data-count]').forEach((el) => {
+    const target = Number(el.dataset.count);
+    if (!animate) {
+      el.textContent = target;
+      return;
+    }
+
+    const counter = { value: 0 };
+    el.textContent = '0';
+    gsap.to(counter, {
+      value: target,
+      duration: 1.8,
+      ease: 'power2.out',
+      onUpdate: () => { el.textContent = Math.round(counter.value); },
+      scrollTrigger: { trigger: el, start: 'top 92%', once: true }
+    });
+  });
+}
+
+// ============================================================================
+// 4. Card Cursor Spotlight
+// ============================================================================
+function initCardSpotlight() {
+  if (!window.matchMedia('(hover: hover)').matches) return;
+
+  document.querySelectorAll('.fx-card').forEach((card) => {
+    card.addEventListener('pointermove', (e) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - rect.left}px`);
+      card.style.setProperty('--my', `${e.clientY - rect.top}px`);
+    });
+  });
+}
+
+// ============================================================================
+// 5. Navigation & Mobile Drawer
 // ============================================================================
 function initNavigation() {
   const header = document.getElementById('navbar');
@@ -68,7 +222,7 @@ function initNavigation() {
 }
 
 // ============================================================================
-// 2. Play Bull & Product Enquiry Interactions
+// 6. Play Bull & Product Enquiry Interactions
 // ============================================================================
 function initProductInteractions() {
   const enquireBtn = document.getElementById('btn-playbull-enquire');
@@ -92,16 +246,21 @@ function handleProductEnquiry(productName) {
   }
 
   if (contactSection) {
-    contactSection.scrollIntoView({ behavior: 'smooth' });
+    if (lenisInstance) {
+      lenisInstance.scrollTo(contactSection, { offset: getNavOffset(), duration: 1.2 });
+    } else {
+      contactSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
     setTimeout(() => {
       const fullNameInput = document.getElementById('full-name');
       if (fullNameInput) fullNameInput.focus();
-    }, 500);
+    }, 600);
   }
 }
 
 // ============================================================================
-// 3. ScrollSpy (Active Section Highlight)
+// 7. ScrollSpy (Active Section Highlight)
 // ============================================================================
 function initScrollSpy() {
   const sections = document.querySelectorAll('section[id]');
@@ -112,7 +271,7 @@ function initScrollSpy() {
 
   const observerOptions = {
     root: null,
-    rootMargin: '-20% 0px -60% 0px',
+    rootMargin: '-20% 0px -55% 0px',
     threshold: 0
   };
 
@@ -149,7 +308,7 @@ function initScrollSpy() {
 }
 
 // ============================================================================
-// 4. Contact Form Validation & Mailto Action
+// 8. Contact Form Validation & Direct Mailto Handling
 // ============================================================================
 function initContactForm() {
   const form = document.getElementById('contact-form');
@@ -211,7 +370,7 @@ Message:
 ${msgVal}
 
 ---
-Sent via Herbalbolt LLP Official Corporate Portal`;
+Sent via Herbalbolt LLP Corporate Portal`;
 
     const mailtoUrl = `mailto:${recipient}?subject=${subject}&body=${encodeURIComponent(bodyContent)}`;
 
@@ -227,7 +386,7 @@ Sent via Herbalbolt LLP Official Corporate Portal`;
         <path d="M20 6 9 17l-5-5"/>
       </svg>
     `;
-    submitBtn.style.backgroundColor = '#70B52F';
+    submitBtn.style.backgroundColor = '#5DB83A';
 
     setTimeout(() => {
       submitBtn.innerHTML = originalBtnText;
