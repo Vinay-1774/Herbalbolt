@@ -360,8 +360,8 @@ function initContactForm() {
 
     if (!isValid) return;
 
-    // Direct mailto link to herbalbolt7@gmail.com
-    const recipient = 'herbalbolt7@gmail.com';
+    // Direct mailto link to info@herbalbolt.com
+    const recipient = 'info@herbalbolt.com';
     const subject = encodeURIComponent(subjectInput.value.trim() || 'Website Enquiry for Herbalbolt LLP');
     const bodyContent = `Name: ${nameVal}
 Email: ${emailVal}
